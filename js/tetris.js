@@ -15,6 +15,7 @@ function Tetris(id) {
         this.$container = $(id);
 
         this.grille = new Grille();
+        this.score = 0;
 
         this.blocActif = null;
         this.nouveauBloc();
@@ -34,12 +35,10 @@ Tetris.prototype.events = function () {
     $(window).keydown(function (e) {
         var key = e.keyCode || e.which;
 
-        var maj;
         switch (key) {
             case 90: // Z
                 tetris.blocActif.tourner();
-                maj = tetris.grille.majGrille();
-                if (!maj) {
+                if (tetris.grille.verifCollision(tetris.blocActif)) {
                     tetris.blocActif.tourner();
                     tetris.blocActif.tourner();
                     tetris.blocActif.tourner();
@@ -49,8 +48,7 @@ Tetris.prototype.events = function () {
                 break;
             case 81: // Q
                 tetris.blocActif.depGauche();
-                maj = tetris.grille.majGrille();
-                if (!maj) {
+                if (tetris.grille.verifCollision(tetris.blocActif)) {
                     tetris.blocActif.depDroite();
                 } else {
                     tetris.afficher();
@@ -58,8 +56,7 @@ Tetris.prototype.events = function () {
                 break;
             case 68: // D
                 tetris.blocActif.depDroite();
-                maj = tetris.grille.majGrille();
-                if (!maj) {
+                if (tetris.grille.verifCollision(tetris.blocActif)) {
                     tetris.blocActif.depGauche();
                 } else {
                     tetris.afficher();
@@ -74,9 +71,7 @@ Tetris.prototype.events = function () {
 
 Tetris.prototype.nouveauBloc = function () {
 
-    this.grille.lignePleine();
-
-    var random = Math.floor(Math.random() * 3) + 1;
+    var random = Math.floor(Math.random() * 7) + 1;
 
     var bloc;
 
@@ -85,23 +80,34 @@ Tetris.prototype.nouveauBloc = function () {
             bloc = new I();
             break;
         case 2:
-            bloc = new N();
+            bloc = new J();
             break;
         case 3:
+            bloc = new L();
+            break;
+        case 4:
+            bloc = new O();
+            break;
+        case 5:
+            bloc = new N();
+            break;
+        case 6:
+            bloc = new S();
+            break;
+        case 7:
             bloc = new T();
             break;
     }
 
     this.blocActif = bloc;
-    this.grille.ajouterBloc(bloc);
-    if (!this.grille.majGrille()) {
+    if (this.grille.verifCollision(this.blocActif)) {
         this.gameOver();
     }
 };
 
 Tetris.prototype.afficher = function () {
 
-    this.grille.afficher();
+    this.grille.afficher(this.blocActif);
     this.$container.html("");
     this.$container.append(this.grille.$grille);
 
@@ -109,18 +115,26 @@ Tetris.prototype.afficher = function () {
 
 Tetris.prototype.run = function () {
     tetris.blocActif.depBas();
-    var maj = tetris.grille.majGrille();
-    if (!maj) {
+    if (tetris.grille.verifCollision(tetris.blocActif)) {
         tetris.blocActif.annuleDepBas();
+        tetris.grille.placerBloc(tetris.blocActif);
+        var nbLignesSuppr = tetris.grille.lignePleine();
+        if (nbLignesSuppr > 0) {
+            tetris.augmenterScore(nbLignesSuppr * (10 + ((nbLignesSuppr - 1) * 5)));
+        }
         tetris.nouveauBloc();
     }
-
     tetris.afficher();
 };
 
 Tetris.prototype.gameOver = function () {
     clearInterval(this.interval);
     console.log("Game Over !");
+};
+
+Tetris.prototype.augmenterScore = function (nbPlus) {
+    this.score += nbPlus;
+    console.log(this.score);
 };
 
 
@@ -139,14 +153,11 @@ function Grille() {
 
     this.grille = [];
 
-    this.blocs = [];
-
-
-    this.reinitGrille();
+    this.initGrille();
 
 }
 
-Grille.prototype.reinitGrille = function () {
+Grille.prototype.initGrille = function () {
     var lin, col;
 
     for (lin = 0; lin < this.NBLIN; lin++) {
@@ -157,22 +168,22 @@ Grille.prototype.reinitGrille = function () {
     }
 };
 
-Grille.prototype.ajouterBloc = function (bloc) {
-    this.blocs.unshift(bloc);
-};
+Grille.prototype.verifCollision = function (bloc) {
+    var nbLin = bloc.bloc.length;
+    var nbCol = bloc.bloc[0].length;
 
-Grille.prototype.majGrille = function () {
-    var nbBlocs = this.blocs.length;
+    var lin, col;
 
-    this.reinitGrille();
-
-    for (var i = 0; i < nbBlocs; i++) {
-        if (!this.placerBloc(this.blocs[i])) {
-            return false;
+    for (lin = 0; lin < nbLin; lin++) {
+        for (col = 0; col < nbCol; col++) {
+            if (bloc.bloc[lin][col]) {
+                if ((bloc.pos.lin + lin) >= this.NBLIN || (bloc.pos.lin + lin) < 0 || (bloc.pos.col + col) >= this.NBCOL || (bloc.pos.col + col) < 0 || this.grille[bloc.pos.lin + lin][bloc.pos.col + col] !== null) {
+                    return true;
+                }
+            }
         }
     }
-
-    return true;
+    return false;
 };
 
 Grille.prototype.placerBloc = function (bloc) {
@@ -184,11 +195,7 @@ Grille.prototype.placerBloc = function (bloc) {
     for (lin = 0; lin < nbLin; lin++) {
         for (col = 0; col < nbCol; col++) {
             if (bloc.bloc[lin][col]) {
-                if ((bloc.pos.lin + lin) >= this.NBLIN || (bloc.pos.lin + lin) < 0 || (bloc.pos.col + col) >= this.NBCOL || (bloc.pos.col + col) < 0 || this.grille[bloc.pos.lin + lin][bloc.pos.col + col] !== null) {
-                    return false;
-                } else {
-                    this.grille[bloc.pos.lin + lin][bloc.pos.col + col] = bloc.bloc[lin][col];
-                }
+                this.grille[bloc.pos.lin + lin][bloc.pos.col + col] = bloc.bloc[lin][col];
             }
         }
     }
@@ -198,10 +205,12 @@ Grille.prototype.placerBloc = function (bloc) {
 Grille.prototype.lignePleine = function () {
     var lin, col, flag;
 
+    var supprlignes = [];
+
     for (lin = 0; lin < this.NBLIN; lin++) {
         flag = true;
         col = 0;
-        while (flag && col < this.NBCOL - 1) {
+        while (flag && col < this.NBCOL) {
             if (this.grille[lin][col] == null) {
                 flag = false;
             }
@@ -209,12 +218,31 @@ Grille.prototype.lignePleine = function () {
         }
 
         if (flag) {
-            console.log("supprimer ligne " + lin);
+            console.log("Supprimer ligne " + lin);
+            supprlignes.push(lin);
         }
     }
+
+    this.supprLignes(supprlignes);
+
+    return supprlignes.length;
 };
 
-Grille.prototype.afficher = function () {
+Grille.prototype.supprLignes = function (lignes) {
+    var lin, col, linSuppI;
+    var nbLinSupp = lignes.length;
+
+    for (linSuppI = 0; linSuppI < nbLinSupp; linSuppI++) {
+        for (lin = lignes[linSuppI]; lin > 0; lin--) {
+            for (col = 0; col < this.NBCOL; col++) {
+                this.grille[lin][col] = this.grille[lin - 1][col];
+            }
+        }
+    }
+
+};
+
+Grille.prototype.afficher = function (blocActif) {
     var lin, col, carre;
 
     var unite = parseInt(this.width / this.NBCOL);
@@ -238,6 +266,8 @@ Grille.prototype.afficher = function () {
             }
         }
     }
+
+    blocActif.afficher(this.$grille, unite);
 };
 
 /**
@@ -318,6 +348,22 @@ Bloc.prototype.annuleDepBas = function () {
     this.pos.lin--;
 };
 
+Bloc.prototype.afficher = function ($grille, unite) {
+    var nbLin = this.bloc.length;
+    var nbCol = this.bloc[0].length;
+    var carre, lin, col;
+
+    for (lin = 0; lin < nbLin; lin++) {
+        for (col = 0; col < nbCol; col++) {
+            carre = this.bloc[lin][col];
+            if (carre) {
+                carre.afficher(unite, lin + this.pos.lin, col + this.pos.col);
+                $grille.append(carre.$carre);
+            }
+        }
+    }
+};
+
 /**
  * Classe I
  * @constructor
@@ -325,7 +371,7 @@ Bloc.prototype.annuleDepBas = function () {
 function I() {
     Bloc.call(this);
 
-    this.color = '#c24646';
+    this.color = '#ff0101';
 
     this.bloc = [
         [new Carre(this.color)],
@@ -339,13 +385,67 @@ I.prototype = Object.create(Bloc.prototype);
 I.prototype.constructor = I;
 
 /**
+ * Classe J
+ * @constructor
+ */
+function J() {
+    Bloc.call(this);
+
+    this.color = '#ff6d01';
+
+    this.bloc = [
+        [new Carre(this.color), null, null],
+        [new Carre(this.color), new Carre(this.color), new Carre(this.color)]
+    ];
+}
+
+J.prototype = Object.create(Bloc.prototype);
+J.prototype.constructor = J;
+
+/**
+ * Classe L
+ * @constructor
+ */
+function L() {
+    Bloc.call(this);
+
+    this.color = '#ffc001';
+
+    this.bloc = [
+        [null, null, new Carre(this.color)],
+        [new Carre(this.color), new Carre(this.color), new Carre(this.color)]
+    ];
+}
+
+L.prototype = Object.create(Bloc.prototype);
+L.prototype.constructor = L;
+
+/**
+ * Classe O
+ * @constructor
+ */
+function O() {
+    Bloc.call(this);
+
+    this.color = '#01ff13';
+
+    this.bloc = [
+        [new Carre(this.color), new Carre(this.color)],
+        [new Carre(this.color), new Carre(this.color)]
+    ];
+}
+
+O.prototype = Object.create(Bloc.prototype);
+O.prototype.constructor = O;
+
+/**
  * Classe N
  * @constructor
  */
 function N() {
     Bloc.call(this);
 
-    this.color = "#54a7c6";
+    this.color = "#019cff";
 
     this.bloc = [
         [null, new Carre(this.color)],
@@ -359,13 +459,32 @@ N.prototype.constructor = N;
 
 
 /**
+ * Classe S
+ * @constructor
+ */
+function S() {
+    Bloc.call(this);
+
+    this.color = "#a801ff";
+
+    this.bloc = [
+        [new Carre(this.color), null],
+        [new Carre(this.color), new Carre(this.color)],
+        [null, new Carre(this.color)]
+    ];
+}
+
+S.prototype = Object.create(Bloc.prototype);
+S.prototype.constructor = S;
+
+/**
  * Classe T
  * @constructor
  */
 function T() {
     Bloc.call(this);
 
-    this.color = "#b567cd";
+    this.color = "#ff0179";
 
     this.bloc = [
         [null, new Carre(this.color), null],
