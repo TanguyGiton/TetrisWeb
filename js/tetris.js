@@ -13,12 +13,15 @@ function Tetris(id) {
     } else {
 
         this.$container = $(id);
-
-        this.grille = new Grille();
-        this.score = 0;
+        this.grille = new Grille(400);
+        this.$side = $(document.createElement('div'));
+        this.score = new Score();
 
         this.blocActif = null;
+        this.nextbloc = this.getBlocAleatoire();
         this.nouveauBloc();
+
+        this.$nextBloc = $(document.createElement('div'));
 
         this.events();
 
@@ -71,45 +74,103 @@ Tetris.prototype.events = function () {
 
 Tetris.prototype.nouveauBloc = function () {
 
-    var random = Math.floor(Math.random() * 7) + 1;
+    this.blocActif = this.nextbloc;
+    this.blocActif.pos.col = 4; // On centre le bloc à l'apparition
+    this.blocActif.pos.lin = 0; // On centre le bloc à l'apparition
+    this.nextbloc = this.getBlocAleatoire();
 
-    var bloc;
+    if (this.grille.verifCollision(this.blocActif)) {
+        this.gameOver();
+        return false
+    }
+
+    return true
+};
+
+Tetris.prototype.getBlocAleatoire = function () {
+    var random = Math.floor(Math.random() * 7) + 1;
 
     switch (random) {
         case 1:
-            bloc = new I();
+            return new I();
             break;
         case 2:
-            bloc = new J();
+            return new J();
             break;
         case 3:
-            bloc = new L();
+            return new L();
             break;
         case 4:
-            bloc = new O();
+            return new O();
             break;
         case 5:
-            bloc = new N();
+            return new N();
             break;
         case 6:
-            bloc = new S();
+            return new S();
             break;
         case 7:
-            bloc = new T();
+            return new T();
             break;
-    }
-
-    this.blocActif = bloc;
-    if (this.grille.verifCollision(this.blocActif)) {
-        this.gameOver();
     }
 };
 
 Tetris.prototype.afficher = function () {
 
+    this.$container
+        .css('position', 'relative')
+        .css('width', (this.grille.width + 200) + 'px')
+        .html("");
+
     this.grille.afficher(this.blocActif);
-    this.$container.html("");
     this.$container.append(this.grille.$grille);
+
+    this.$side
+        .css('position', 'absolute')
+        .css('left', this.grille.width + 'px')
+        .css('top', 0)
+        .css('width', '200px')
+        .css('height', '100%')
+        .css('background', '#e5e5e4')
+        .css('padding-top', '15px')
+        .html('<h4 style="text-align: center"><strong>SUIVANT</strong></h4>')
+    ;
+
+    var unite = parseInt(this.grille.width / this.grille.NBCOL);
+
+    this.nextbloc.pos.lin = parseInt((4 - this.nextbloc.bloc.length) / 2);
+
+    this.$nextBloc
+        .css('position', 'relative')
+        .css('height', (4 * unite) + 'px')
+        .css('width', (this.nextbloc.bloc[0].length * unite) + 'px')
+        .css('left', '50%')
+        .css('margin-left', '-' + (this.nextbloc.bloc[0].length * unite) / 2 + 'px')
+        .html('')
+    ;
+
+    this.nextbloc.afficher(this.$nextBloc, unite);
+    this.$side.append(this.$nextBloc);
+
+    this.score.afficher(0, this.grille.width);
+    this.$side
+        .append('<div style="height: 20px"></div>')
+        .append(this.score.$score);
+
+    this.$side
+        .append('<div style="height: 20px"></div>')
+        .append(
+            '<h3 style="text-align: center">COMMANDES</h3>' +
+            '<div style="padding: 10px 0 0 50px; font-size: 16px;">' +
+            '<strong>Q</strong> gauche<br>' +
+            '<strong>D</strong> droite<br>' +
+            '<strong>Z</strong> tourner<br>' +
+            '<strong>S</strong> descendre<br>' +
+            '</div>'
+        );
+
+    this.$container.append(this.$side);
+
 
 };
 
@@ -120,21 +181,22 @@ Tetris.prototype.run = function () {
         tetris.grille.placerBloc(tetris.blocActif);
         var nbLignesSuppr = tetris.grille.lignePleine();
         if (nbLignesSuppr > 0) {
-            tetris.augmenterScore(nbLignesSuppr * (10 + ((nbLignesSuppr - 1) * 5)));
+            tetris.score.augmenterScore(nbLignesSuppr * (10 + ((nbLignesSuppr - 1) * 5)));
         }
-        tetris.nouveauBloc();
+        if (!tetris.nouveauBloc()) {
+            return false;
+        }
     }
     tetris.afficher();
+    return true;
 };
 
 Tetris.prototype.gameOver = function () {
-    clearInterval(this.interval);
-    console.log("Game Over !");
-};
-
-Tetris.prototype.augmenterScore = function (nbPlus) {
-    this.score += nbPlus;
-    console.log(this.score);
+    alert("Game Over ! Score : " + this.score.points + " points");
+    this.grille.initGrille();
+    this.score.points = 0;
+    this.nouveauBloc();
+    this.afficher();
 };
 
 
@@ -142,12 +204,12 @@ Tetris.prototype.augmenterScore = function (nbPlus) {
  * Classe Grille
  * @constructor
  */
-function Grille() {
+function Grille(width) {
 
     this.NBCOL = 10;
     this.NBLIN = 18;
 
-    this.width = 400;
+    this.width = width;
 
     this.$grille = $(document.createElement('div'));
 
@@ -218,7 +280,6 @@ Grille.prototype.lignePleine = function () {
         }
 
         if (flag) {
-            console.log("Supprimer ligne " + lin);
             supprlignes.push(lin);
         }
     }
@@ -448,9 +509,8 @@ function N() {
     this.color = "#019cff";
 
     this.bloc = [
-        [null, new Carre(this.color)],
-        [new Carre(this.color), new Carre(this.color)],
-        [new Carre(this.color), null]
+        [new Carre(this.color), new Carre(this.color), null],
+        [null, new Carre(this.color), new Carre(this.color)]
     ];
 }
 
@@ -468,9 +528,8 @@ function S() {
     this.color = "#a801ff";
 
     this.bloc = [
-        [new Carre(this.color), null],
-        [new Carre(this.color), new Carre(this.color)],
-        [null, new Carre(this.color)]
+        [null, new Carre(this.color), new Carre(this.color)],
+        [new Carre(this.color), new Carre(this.color), null]
     ];
 }
 
@@ -494,3 +553,35 @@ function T() {
 
 T.prototype = Object.create(Bloc.prototype);
 T.prototype.constructor = T;
+
+/**
+ * Classe Score
+ * @constructor
+ */
+
+function Score() {
+    this.points = 0;
+
+    this.$score = $(document.createElement('div'));
+}
+
+Score.prototype.augmenterScore = function (nbPlus) {
+
+    this.points += nbPlus;
+};
+
+Score.prototype.afficher = function () {
+    this.$score
+        .css('width', '100%')
+        .css('text-align', 'center')
+        .css('padding', '30px 0')
+        .css('border-top', '1px solid #000')
+        .css('border-bottom', '1px solid #000')
+        .attr('id', 'tetris-score')
+        .append('<div style="height: 20px"></div>')
+        .html(
+            '<h3 style="text-align: center; margin-top: 0">SCORE</h3>' +
+            "<strong>" + this.points + ' points</strong>'
+        )
+    ;
+};
